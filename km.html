@@ -1,0 +1,953 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>拡張キーボードイベントモニター</title>
+    <style>
+        body {
+            font-family: 'Hiragino Sans', 'Meiryo', sans-serif;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+        .container {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        .control-panel {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background-color: #f5f5f5;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        .buttons-container {
+            display: flex;
+            gap: 10px;
+        }
+        .event-counter {
+            font-weight: bold;
+        }
+        .btn {
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        .clean-btn {
+            background-color: #e74c3c;
+            color: white;
+        }
+        .clean-btn:hover {
+            background-color: #c0392b;
+        }
+        .export-btn {
+            background-color: #9b59b6;
+            color: white;
+        }
+        .export-btn:hover {
+            background-color: #8e44ad;
+        }
+        .filter-container {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+            flex-wrap: wrap;
+        }
+        .filter-btn {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .filter-btn.active {
+            background-color: #2980b9;
+            font-weight: bold;
+        }
+        .filter-btn.all {
+            background-color: #2ecc71;
+        }
+        .filter-btn.all.active {
+            background-color: #27ae60;
+        }
+        .filter-btn.custom {
+            background-color: #f39c12;
+        }
+        .filter-btn.custom.active {
+            background-color: #d35400;
+        }
+        .events-container {
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 10px;
+            max-height: 500px;
+            overflow-y: auto;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+            font-size: 14px;
+        }
+        th {
+            background-color: #f2f2f2;
+            position: sticky;
+            top: 0;
+        }
+        .event-row:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        .event-row.keydown {
+            border-left: 4px solid #3498db;
+        }
+        .event-row.keyup {
+            border-left: 4px solid #2ecc71;
+        }
+        .event-row.keypress {
+            border-left: 4px solid #f39c12;
+        }
+        .event-row.compositionstart, .event-row.compositionupdate, .event-row.compositionend {
+            border-left: 4px solid #9b59b6;
+        }
+        .key-modifiers span {
+            display: inline-block;
+            background-color: #eee;
+            padding: 2px 6px;
+            border-radius: 3px;
+            margin-right: 5px;
+            font-size: 0.9em;
+        }
+        .instructions {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            border-left: 4px solid #3498db;
+        }
+        .keyboard-visual {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            margin-top: 20px;
+            background-color: #f0f0f0;
+            padding: 15px;
+            border-radius: 5px;
+        }
+        .keyboard-row {
+            display: flex;
+            gap: 5px;
+            justify-content: center;
+        }
+        .key {
+            width: 40px;
+            height: 40px;
+            background-color: #fff;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            box-shadow: 0 2px 2px rgba(0,0,0,0.1);
+        }
+        .key.pressed {
+            background-color: #3498db;
+            color: white;
+            transform: translateY(2px);
+            box-shadow: none;
+        }
+        .key.wide {
+            width: 60px;
+        }
+        .key.extra-wide {
+            width: 80px;
+        }
+        .key.space {
+            width: 200px;
+        }
+        .timing-info {
+            font-style: italic;
+            color: #666;
+        }
+        .options-panel {
+            background-color: #f5f5f5;
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 20px;
+        }
+        .options-title {
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        .options-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 10px;
+        }
+        .option-item {
+            display: flex;
+            align-items: center;
+        }
+        .option-item label {
+            margin-left: 5px;
+        }
+        .tab-container {
+            display: flex;
+            border-bottom: 1px solid #ddd;
+            margin-bottom: 15px;
+        }
+        .tab {
+            padding: 8px 16px;
+            cursor: pointer;
+            background-color: #f5f5f5;
+            border: 1px solid #ddd;
+            border-bottom: none;
+            border-radius: 4px 4px 0 0;
+            margin-right: 5px;
+        }
+        .tab.active {
+            background-color: #fff;
+            border-bottom: 1px solid #fff;
+            margin-bottom: -1px;
+            font-weight: bold;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        .sequence-monitor {
+            padding: 15px;
+            background-color: #f5f5f5;
+            border-radius: 5px;
+            margin-top: 15px;
+        }
+        .sequence-title {
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        .key-sequence {
+            font-family: monospace;
+            padding: 10px;
+            background-color: #fff;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+            min-height: 20px;
+        }
+        .control-key {
+            display: inline-block;
+            padding: 2px 6px;
+            margin: 2px;
+            border-radius: 3px;
+            font-size: 0.9em;
+            font-weight: bold;
+            color: white;
+        }
+        .control-key.enter {
+            background-color: #3498db;
+        }
+        .control-key.backspace {
+            background-color: #e74c3c;
+        }
+        .control-key.tab {
+            background-color: #9b59b6;
+        }
+        .control-key.escape {
+            background-color: #f39c12;
+        }
+        .control-key.delete {
+            background-color: #c0392b;
+        }
+        .control-key.arrow {
+            background-color: #16a085;
+        }
+        .control-key.space {
+            background-color: #7f8c8d;
+        }
+        .control-key.other {
+            background-color: #2c3e50;
+        }
+        .status-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 5px;
+        }
+        .status-indicator.active {
+            background-color: #2ecc71;
+        }
+        .status-indicator.inactive {
+            background-color: #e74c3c;
+        }
+    </style>
+</head>
+<body>
+    <h1>拡張キーボードイベントモニター</h1>
+    
+    <div class="instructions">
+        <p>このページは様々なキーボードイベントを監視します。ページ上の任意の場所をクリックして入力を開始すると、キャプチャされたイベントが表示されます。</p>
+        <p>イベントはリアルタイムで記録され、押されたキー、キーコード、同時に使用された修飾キーが表示されます。</p>
+        <p>追加機能：IME入力の検出、キーの位置情報、キーの持続時間計測、視覚的キーボード表示など</p>
+    </div>
+    
+    <div class="tab-container">
+        <div class="tab active" data-tab="events">イベントログ</div>
+        <div class="tab" data-tab="keyboard">視覚的キーボード</div>
+        <div class="tab" data-tab="sequences">キーシーケンス</div>
+        <div class="tab" data-tab="options">オプション</div>
+    </div>
+    
+    <div class="container">
+        <div class="control-panel">
+            <div class="event-counter">記録されたイベント: <span id="event-count">0</span></div>
+            <div class="buttons-container">
+                <button id="export-btn" class="btn export-btn">エクスポート</button>
+                <button id="clean-btn" class="btn clean-btn">クリア</button>
+            </div>
+        </div>
+        
+        <div class="filter-container">
+            <button id="filter-all" class="filter-btn all active">すべて</button>
+            <button id="filter-keydown" class="filter-btn">keydown</button>
+            <button id="filter-keyup" class="filter-btn">keyup</button>
+            <button id="filter-keypress" class="filter-btn">keypress</button>
+            <button id="filter-composition" class="filter-btn custom">IME関連</button>
+        </div>
+        
+        <div id="events-tab" class="tab-content active">
+            <div class="events-container">
+                <table id="events-table">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>イベントタイプ</th>
+                            <th>キー</th>
+                            <th>コード</th>
+                            <th>キーコード</th>
+                            <th>修飾キー</th>
+                            <th>位置</th>
+                            <th>繰り返し</th>
+                            <th>IME</th>
+                            <th>時間</th>
+                        </tr>
+                    </thead>
+                    <tbody id="events-list">
+                        <!-- イベント行がここに追加されます -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        
+        <div id="keyboard-tab" class="tab-content">
+            <div class="keyboard-visual">
+                <div class="keyboard-row">
+                    <div class="key" data-key="Escape">Esc</div>
+                    <div class="key" data-key="F1">F1</div>
+                    <div class="key" data-key="F2">F2</div>
+                    <div class="key" data-key="F3">F3</div>
+                    <div class="key" data-key="F4">F4</div>
+                    <div class="key" data-key="F5">F5</div>
+                    <div class="key" data-key="F6">F6</div>
+                    <div class="key" data-key="F7">F7</div>
+                    <div class="key" data-key="F8">F8</div>
+                    <div class="key" data-key="F9">F9</div>
+                    <div class="key" data-key="F10">F10</div>
+                    <div class="key" data-key="F11">F11</div>
+                    <div class="key" data-key="F12">F12</div>
+                </div>
+                <div class="keyboard-row">
+                    <div class="key" data-key="Backquote">`</div>
+                    <div class="key" data-key="Digit1">1</div>
+                    <div class="key" data-key="Digit2">2</div>
+                    <div class="key" data-key="Digit3">3</div>
+                    <div class="key" data-key="Digit4">4</div>
+                    <div class="key" data-key="Digit5">5</div>
+                    <div class="key" data-key="Digit6">6</div>
+                    <div class="key" data-key="Digit7">7</div>
+                    <div class="key" data-key="Digit8">8</div>
+                    <div class="key" data-key="Digit9">9</div>
+                    <div class="key" data-key="Digit0">0</div>
+                    <div class="key" data-key="Minus">-</div>
+                    <div class="key" data-key="Equal">=</div>
+                    <div class="key wide" data-key="Backspace">←</div>
+                </div>
+                <div class="keyboard-row">
+                    <div class="key wide" data-key="Tab">Tab</div>
+                    <div class="key" data-key="KeyQ">Q</div>
+                    <div class="key" data-key="KeyW">W</div>
+                    <div class="key" data-key="KeyE">E</div>
+                    <div class="key" data-key="KeyR">R</div>
+                    <div class="key" data-key="KeyT">T</div>
+                    <div class="key" data-key="KeyY">Y</div>
+                    <div class="key" data-key="KeyU">U</div>
+                    <div class="key" data-key="KeyI">I</div>
+                    <div class="key" data-key="KeyO">O</div>
+                    <div class="key" data-key="KeyP">P</div>
+                    <div class="key" data-key="BracketLeft">[</div>
+                    <div class="key" data-key="BracketRight">]</div>
+                    <div class="key" data-key="Backslash">\</div>
+                </div>
+                <div class="keyboard-row">
+                    <div class="key extra-wide" data-key="CapsLock">Caps</div>
+                    <div class="key" data-key="KeyA">A</div>
+                    <div class="key" data-key="KeyS">S</div>
+                    <div class="key" data-key="KeyD">D</div>
+                    <div class="key" data-key="KeyF">F</div>
+                    <div class="key" data-key="KeyG">G</div>
+                    <div class="key" data-key="KeyH">H</div>
+                    <div class="key" data-key="KeyJ">J</div>
+                    <div class="key" data-key="KeyK">K</div>
+                    <div class="key" data-key="KeyL">L</div>
+                    <div class="key" data-key="Semicolon">;</div>
+                    <div class="key" data-key="Quote">'</div>
+                    <div class="key extra-wide" data-key="Enter">Enter</div>
+                </div>
+                <div class="keyboard-row">
+                    <div class="key extra-wide" data-key="ShiftLeft">Shift</div>
+                    <div class="key" data-key="KeyZ">Z</div>
+                    <div class="key" data-key="KeyX">X</div>
+                    <div class="key" data-key="KeyC">C</div>
+                    <div class="key" data-key="KeyV">V</div>
+                    <div class="key" data-key="KeyB">B</div>
+                    <div class="key" data-key="KeyN">N</div>
+                    <div class="key" data-key="KeyM">M</div>
+                    <div class="key" data-key="Comma">,</div>
+                    <div class="key" data-key="Period">.</div>
+                    <div class="key" data-key="Slash">/</div>
+                    <div class="key extra-wide" data-key="ShiftRight">Shift</div>
+                </div>
+                <div class="keyboard-row">
+                    <div class="key wide" data-key="ControlLeft">Ctrl</div>
+                    <div class="key wide" data-key="MetaLeft">Win</div>
+                    <div class="key wide" data-key="AltLeft">Alt</div>
+                    <div class="key space" data-key="Space">Space</div>
+                    <div class="key wide" data-key="AltRight">Alt</div>
+                    <div class="key wide" data-key="MetaRight">Win</div>
+                    <div class="key wide" data-key="ContextMenu">Menu</div>
+                    <div class="key wide" data-key="ControlRight">Ctrl</div>
+                </div>
+            </div>
+            <div class="sequence-monitor">
+                <div class="sequence-title">現在押されているキー:</div>
+                <div class="key-sequence" id="pressed-keys"></div>
+            </div>
+        </div>
+        
+        <div id="sequences-tab" class="tab-content">
+            <div class="sequence-monitor">
+                <div class="sequence-title">最近のキーシーケンス:</div>
+                <div class="key-sequence" id="key-sequence"></div>
+            </div>
+            <div class="sequence-monitor">
+                <div class="sequence-title">実際の入力文字シーケンス:</div>
+                <div class="key-sequence" id="text-sequence" style="white-space: pre-wrap; min-height: 100px; max-height: 200px; overflow-y: auto; line-height: 1.5;"></div>
+            </div>
+            <div class="sequence-monitor">
+                <div class="sequence-title">キー保持時間:</div>
+                <div class="key-sequence" id="key-duration"></div>
+            </div>
+        </div>
+        
+        <div id="options-tab" class="tab-content">
+            <div class="options-panel">
+                <div class="options-title">表示オプション:</div>
+                <div class="options-grid">
+                    <div class="option-item">
+                        <input type="checkbox" id="show-keydown" checked>
+                        <label for="show-keydown">keydownイベントを表示</label>
+                    </div>
+                    <div class="option-item">
+                        <input type="checkbox" id="show-keyup" checked>
+                        <label for="show-keyup">keyupイベントを表示</label>
+                    </div>
+                    <div class="option-item">
+                        <input type="checkbox" id="show-keypress" checked>
+                        <label for="show-keypress">keypressイベントを表示</label>
+                    </div>
+                    <div class="option-item">
+                        <input type="checkbox" id="show-composition" checked>
+                        <label for="show-composition">IMEイベントを表示</label>
+                    </div>
+                    <div class="option-item">
+                        <input type="checkbox" id="auto-scroll" checked>
+                        <label for="auto-scroll">自動スクロール</label>
+                    </div>
+                    <div class="option-item">
+                        <input type="checkbox" id="show-keyboard" checked>
+                        <label for="show-keyboard">視覚的キーボードを更新</label>
+                    </div>
+                </div>
+                
+                <div class="options-title" style="margin-top: 20px;">ステータス:</div>
+                <div class="option-item">
+                    <span class="status-indicator active" id="keyboard-status"></span>
+                    キーボード入力アクティブ
+                </div>
+                <div class="option-item">
+                    <span class="status-indicator inactive" id="ime-status"></span>
+                    IME入力アクティブ
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // メイン変数
+        const eventsList = document.getElementById('events-list');
+        const cleanBtn = document.getElementById('clean-btn');
+        const exportBtn = document.getElementById('export-btn');
+        const eventCount = document.getElementById('event-count');
+        const filterAll = document.getElementById('filter-all');
+        const filterKeydown = document.getElementById('filter-keydown');
+        const filterKeyup = document.getElementById('filter-keyup');
+        const filterKeypress = document.getElementById('filter-keypress');
+        const filterComposition = document.getElementById('filter-composition');
+        const keySequenceDisplay = document.getElementById('key-sequence');
+        const textSequenceDisplay = document.getElementById('text-sequence');
+        const keyDurationDisplay = document.getElementById('key-duration');
+        const pressedKeysDisplay = document.getElementById('pressed-keys');
+        const imeStatus = document.getElementById('ime-status');
+        
+        // タブ関連
+        const tabs = document.querySelectorAll('.tab');
+        const tabContents = document.querySelectorAll('.tab-content');
+        
+        // オプションチェックボックス
+        const showKeydown = document.getElementById('show-keydown');
+        const showKeyup = document.getElementById('show-keyup');
+        const showKeypress = document.getElementById('show-keypress');
+        const showComposition = document.getElementById('show-composition');
+        const autoScroll = document.getElementById('auto-scroll');
+        const showKeyboard = document.getElementById('show-keyboard');
+        
+        let eventCounter = 0;
+        let currentFilter = 'all';
+        let keyDownTimes = {}; // キーが押された時間を記録
+        let pressedKeys = new Set(); // 現在押されているキー
+        let recentKeySequence = []; // 最近のキーシーケンス
+        let textSequence = ""; // 実際のテキスト入力
+        let isComposing = false; // IME入力中かどうか
+        let lastCompositionValue = ""; // 最後のIME合成値
+        
+        // イベントデータ保存用
+        let eventData = [];
+        
+        // イベントタイプをリッスンする
+        const keyboardEventTypes = ['keydown', 'keyup', 'keypress'];
+        const compositionEventTypes = ['compositionstart', 'compositionupdate', 'compositionend'];
+        
+        // イベントリスナーを追加
+        keyboardEventTypes.forEach(eventType => {
+            document.addEventListener(eventType, event => {
+                if (shouldRecordEvent(eventType)) {
+                    recordKeyboardEvent(event, eventType);
+                }
+            });
+        });
+        
+        // IME関連イベントリスナーを追加
+        compositionEventTypes.forEach(eventType => {
+            document.addEventListener(eventType, event => {
+                if (showComposition.checked) {
+                    recordCompositionEvent(event, eventType);
+                }
+                
+                // IME状態を追跡
+                if (eventType === 'compositionstart') {
+                    isComposing = true;
+                    imeStatus.classList.remove('inactive');
+                    imeStatus.classList.add('active');
+                } else if (eventType === 'compositionupdate') {
+                    lastCompositionValue = event.data;
+                } else if (eventType === 'compositionend') {
+                    isComposing = false;
+                    imeStatus.classList.remove('active');
+                    imeStatus.classList.add('inactive');
+                    
+                    // IME確定時にテキストシーケンスに追加
+                    updateTextSequence(event.data);
+                }
+            });
+        });
+        
+        // 選択されたイベントを記録すべきかチェック
+        function shouldRecordEvent(eventType) {
+            if (eventType === 'keydown' && !showKeydown.checked) return false;
+            if (eventType === 'keyup' && !showKeyup.checked) return false;
+            if (eventType === 'keypress' && !showKeypress.checked) return false;
+            return true;
+        }
+        
+        // クリアボタンの機能
+        cleanBtn.addEventListener('click', () => {
+            eventsList.innerHTML = '';
+            eventCounter = 0;
+            eventCount.textContent = eventCounter;
+            eventData = [];
+            keySequenceDisplay.textContent = '';
+            keyDurationDisplay.textContent = '';
+            textSequenceDisplay.innerHTML = '';
+            textSequence = '';
+            recentKeySequence = [];
+        });
+        
+        // エクスポートボタンの機能
+        exportBtn.addEventListener('click', () => {
+            const dataStr = JSON.stringify(eventData, null, 2);
+            const blob = new Blob([dataStr], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'keyboard-events.json';
+            a.click();
+            
+            URL.revokeObjectURL(url);
+        });
+        
+        // タブ切り替え
+        tabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                tabs.forEach(t => t.classList.remove('active'));
+                tabContents.forEach(content => content.classList.remove('active'));
+                
+                tab.classList.add('active');
+                const tabId = tab.getAttribute('data-tab');
+                document.getElementById(`${tabId}-tab`).classList.add('active');
+            });
+        });
+        
+        // フィルター機能
+        filterAll.addEventListener('click', () => setFilter('all'));
+        filterKeydown.addEventListener('click', () => setFilter('keydown'));
+        filterKeyup.addEventListener('click', () => setFilter('keyup'));
+        filterKeypress.addEventListener('click', () => setFilter('keypress'));
+        filterComposition.addEventListener('click', () => setFilter('composition'));
+        
+        // フィルターを設定する関数
+        function setFilter(filterType) {
+            currentFilter = filterType;
+            
+            // アクティブなフィルターボタンを更新
+            [filterAll, filterKeydown, filterKeyup, filterKeypress, filterComposition].forEach(btn => {
+                btn.classList.remove('active');
+            });
+            
+            document.getElementById(`filter-${filterType}`).classList.add('active');
+            
+            // すべての行を表示/非表示
+            const rows = eventsList.querySelectorAll('tr');
+            rows.forEach(row => {
+                if (filterType === 'all') {
+                    row.style.display = '';
+                } else if (filterType === 'composition') {
+                    // 合成イベントの場合
+                    const isCompositionEvent = ['compositionstart', 'compositionupdate', 'compositionend'].some(
+                        type => row.classList.contains(type)
+                    );
+                    row.style.display = isCompositionEvent ? '' : 'none';
+                } else {
+                    row.style.display = row.classList.contains(filterType) ? '' : 'none';
+                }
+            });
+        }
+        
+        // キーボードイベントを記録する関数
+        function recordKeyboardEvent(event, eventType) {
+            // キーの状態を追跡
+            if (eventType === 'keydown') {
+                // キーが押された時間を記録
+                if (!keyDownTimes[event.code]) {
+                    keyDownTimes[event.code] = Date.now();
+                }
+                pressedKeys.add(event.code);
+                
+                // テキスト入力の処理（IME入力中でない場合のみ）
+                if (!isComposing) {
+                    processTextInput(event);
+                }
+            } else if (eventType === 'keyup') {
+                // キーの押下時間を計算
+                const downTime = keyDownTimes[event.code];
+                if (downTime) {
+                    const duration = Date.now() - downTime;
+                    updateKeyDuration(event.code, duration);
+                    delete keyDownTimes[event.code];
+                }
+                pressedKeys.delete(event.code);
+            }
+            
+            // キーシーケンスを更新
+            if (eventType === 'keydown') {
+                updateKeySequence(event.code);
+            }
+            
+            // 現在押されているキーの表示を更新
+            updatePressedKeysDisplay();
+            
+            // 視覚的キーボードを更新
+            if (showKeyboard.checked) {
+                updateVisualKeyboard();
+            }
+            
+            // カウンターをインクリメント
+            eventCounter++;
+            eventCount.textContent = eventCounter;
+            
+            // 新しい行を作成
+            const newRow = document.createElement('tr');
+            newRow.className = `event-row ${eventType}`;
+            
+            // 現在の時刻を取得
+            const currentTime = new Date();
+            const timeString = currentTime.toLocaleTimeString() + '.' + currentTime.getMilliseconds().toString().padStart(3, '0');
+            
+            // 修飾キーを取得（重複を避ける）
+            const modifiers = new Set();
+            
+            // メインキーが修飾キーでない場合のみ修飾キー情報を追加
+            if (event.key !== 'Control' && event.ctrlKey) modifiers.add('Ctrl');
+            if (event.key !== 'Shift' && event.shiftKey) modifiers.add('Shift');
+            if (event.key !== 'Alt' && event.altKey) modifiers.add('Alt');
+            if (event.key !== 'Meta' && event.metaKey) modifiers.add('Meta');
+            
+            // 修飾キーのHTMLを準備
+            const modifiersArray = Array.from(modifiers);
+            const modifiersHtml = modifiersArray.length > 0 
+                ? modifiersArray.map(mod => `<span>${mod}</span>`).join('') 
+                : 'なし';
+            
+            // キーの位置を表示
+            let locationText = 'なし';
+            if (event.location === 1) locationText = '左';
+            else if (event.location === 2) locationText = '右';
+            else if (event.location === 3) locationText = 'テンキー';
+            
+            // 行の内容を設定
+            newRow.innerHTML = `
+                <td>${eventCounter}</td>
+                <td>${eventType}</td>
+                <td>${event.key || 'N/A'}</td>
+                <td>${event.code || 'N/A'}</td>
+                <td>${event.keyCode || event.which || 'N/A'}</td>
+                <td class="key-modifiers">${modifiersHtml}</td>
+                <td>${locationText}</td>
+                <td>${event.repeat ? 'はい' : 'いいえ'}</td>
+                <td>${isComposing ? 'アクティブ' : '非アクティブ'}</td>
+                <td>${timeString}</td>
+            `;
+            
+            // イベントデータを保存
+            eventData.push({
+                id: eventCounter,
+                type: eventType,
+                key: event.key,
+                code: event.code,
+                keyCode: event.keyCode || event.which,
+                modifiers: Array.from(modifiers),
+                location: locationText,
+                repeat: event.repeat,
+                isComposing: isComposing,
+                time: timeString,
+                timestamp: Date.now()
+            });
+            
+            // リストに追加
+            eventsList.prepend(newRow);
+            
+            // 現在のフィルターに基づいて表示/非表示
+            if (currentFilter !== 'all' && eventType !== currentFilter) {
+                newRow.style.display = 'none';
+            }
+            
+            // 自動スクロール
+            if (autoScroll.checked) {
+                const container = document.querySelector('.events-container');
+                container.scrollTop = 0;
+            }
+        }
+        
+        // IME合成イベントを記録する関数
+        function recordCompositionEvent(event, eventType) {
+            // カウンターをインクリメント
+            eventCounter++;
+            eventCount.textContent = eventCounter;
+            
+            // 新しい行を作成
+            const newRow = document.createElement('tr');
+            newRow.className = `event-row ${eventType}`;
+            
+            // 現在の時刻を取得
+            const currentTime = new Date();
+            const timeString = currentTime.toLocaleTimeString() + '.' + currentTime.getMilliseconds().toString().padStart(3, '0');
+            
+            // 行の内容を設定
+            newRow.innerHTML = `
+                <td>${eventCounter}</td>
+                <td>${eventType}</td>
+                <td colspan="2">${event.data || 'N/A'}</td>
+                <td>N/A</td>
+                <td class="key-modifiers">なし</td>
+                <td>なし</td>
+                <td>いいえ</td>
+                <td>アクティブ</td>
+                <td>${timeString}</td>
+            `;
+            
+            // イベントデータを保存
+            eventData.push({
+                id: eventCounter,
+                type: eventType,
+                data: event.data,
+                time: timeString,
+                timestamp: Date.now()
+            });
+            
+            // リストに追加
+            eventsList.prepend(newRow);
+            
+            // 現在のフィルターに基づいて表示/非表示
+            if (currentFilter !== 'all' && currentFilter !== 'composition') {
+                newRow.style.display = 'none';
+            }
+            
+            // 自動スクロール
+            if (autoScroll.checked) {
+                const container = document.querySelector('.events-container');
+                container.scrollTop = 0;
+            }
+        }
+        
+        // キーシーケンスを更新する関数
+        function updateKeySequence(keyCode) {
+            recentKeySequence.push(keyCode);
+            if (recentKeySequence.length > 10) {
+                recentKeySequence.shift();
+            }
+            keySequenceDisplay.textContent = recentKeySequence.join(' → ');
+        }
+        
+        // キー保持時間を更新する関数
+        function updateKeyDuration(keyCode, duration) {
+            const durationText = `${keyCode}: ${duration}ms`;
+            const currentContent = keyDurationDisplay.textContent;
+            
+            if (currentContent) {
+                keyDurationDisplay.textContent = durationText + ' | ' + currentContent;
+            } else {
+                keyDurationDisplay.textContent = durationText;
+            }
+            
+            // 長すぎる場合は古い情報を削除
+            const parts = keyDurationDisplay.textContent.split(' | ');
+            if (parts.length > 10) {
+                keyDurationDisplay.textContent = parts.slice(0, 10).join(' | ');
+            }
+        }
+        
+        // 現在押されているキーの表示を更新する関数
+        function updatePressedKeysDisplay() {
+            pressedKeysDisplay.textContent = Array.from(pressedKeys).join(' + ') || 'なし';
+        }
+        
+        // 視覚的キーボードを更新する関数
+        function updateVisualKeyboard() {
+            const keys = document.querySelectorAll('.key');
+            keys.forEach(key => {
+                const keyCode = key.getAttribute('data-key');
+                if (pressedKeys.has(keyCode)) {
+                    key.classList.add('pressed');
+                } else {
+                    key.classList.remove('pressed');
+                }
+            });
+        }
+        
+        // テキスト入力を処理する関数
+        function processTextInput(event) {
+            // 修飾キーだけが押されている場合は無視
+            if (event.ctrlKey || event.altKey || event.metaKey) {
+                if (['Control', 'Alt', 'Meta', 'Shift'].includes(event.key)) {
+                    return;
+                }
+            }
+            
+            // 特殊キーの処理
+            switch (event.key) {
+                case 'Enter':
+                    updateTextSequence('<span class="control-key enter">Enter</span>\n');
+                    break;
+                case 'Backspace':
+                    // バックスペースの表示と実際のテキスト削除
+                    textSequence = textSequence.slice(0, -1);
+                    updateTextSequence('<span class="control-key backspace">Backspace</span>');
+                    break;
+                case 'Tab':
+                    event.preventDefault(); // デフォルトのタブ動作を防止
+                    updateTextSequence('<span class="control-key tab">Tab</span>\t');
+                    break;
+                case 'Escape':
+                    updateTextSequence('<span class="control-key escape">Esc</span>');
+                    break;
+                case 'Delete':
+                    updateTextSequence('<span class="control-key delete">Delete</span>');
+                    break;
+                case 'ArrowUp':
+                    updateTextSequence('<span class="control-key arrow">↑</span>');
+                    break;
+                case 'ArrowDown':
+                    updateTextSequence('<span class="control-key arrow">↓</span>');
+                    break;
+                case 'ArrowLeft':
+                    updateTextSequence('<span class="control-key arrow">←</span>');
+                    break;
+                case 'ArrowRight':
+                    updateTextSequence('<span class="control-key arrow">→</span>');
+                    break;
+                case ' ':
+                    updateTextSequence('<span class="control-key space">Space</span> ');
+                    break;
+                default:
+                    // 通常の文字入力
+                    if (event.key.length === 1) {
+                        updateTextSequence(event.key);
+                    } else if (event.key !== 'Shift' && event.key !== 'Control' && event.key !== 'Alt' && event.key !== 'Meta') {
+                        // その他の特殊キー
+                        updateTextSequence(`<span class="control-key other">${event.key}</span>`);
+                    }
+            }
+        }
+        
+        // テキストシーケンスを更新する関数
+        function updateTextSequence(text) {
+            // HTML要素を安全に追加するため、innerHTMLを使用
+            if (text === '<span class="control-key backspace">Backspace</span>') {
+                // バックスペースの場合、表示と内部テキストを別々に処理
+                textSequenceDisplay.innerHTML += text;
+            } else {
+                textSequence += text.replace(/<[^>]*>/g, ''); // HTMLタグを除去してプレーンテキストだけ保持
+                textSequenceDisplay.innerHTML += text;
+            }
+            
+            // 自動スクロール
+            textSequenceDisplay.scrollTop = textSequenceDisplay.scrollHeight;
+        }
+    </script>
+</body>
+</html>
